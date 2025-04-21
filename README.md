@@ -18,7 +18,7 @@ The goal is to provide a flexible and open environment where new functionalities
 
 We welcome contributions from the community!
 
-If you have an idea, extension, or experimental work based on BESSER, feel free to contribute to this repository. You can [create an issue](https://github.com/BESSER-PEARL/BESSER-labs/issues) to discuss your idea, or follow these guidelines to submit your contribution directly:
+If you have an idea, extension, or experimental work based on BESSER, feel free to contribute to this repository. You can [create an issue](https://github.com/BESSER-PEARL/BESSER-labs/issues/new/choose) to discuss your idea, or follow these guidelines to submit your contribution directly:
 
 ### 🛠 How to Contribute
 
@@ -33,5 +33,6 @@ If you have an idea, extension, or experimental work based on BESSER, feel free 
 - Place your contribution inside a clearly named folder. For example: `my-code-generator/`
 - Add a `README.md` inside your folder to explain the purpose of your contribution and how to use it.
 - Make sure your code is clear and well-documented.
-- Push your branch and [open a Pull Request](https://github.com/BESSER-PEARL/BESSER-labs/pulls).
+- Push your branch and [open a Pull Request](https://github.com/BESSER-PEARL/BESSER-labs/compare).
 
+Once you submit your contribution, the BESSER team will review your code and provide feedback or suggestions if necessary.
