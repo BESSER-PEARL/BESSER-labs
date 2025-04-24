@@ -42,7 +42,7 @@
 
 {%- set usings_already = [] -%}
 {% set associations = [] %}
-{# 0. Check associations #}
+{# 0. Get associations and their multiplicities #}
 {%- for ass in model.associations -%} 
     {% set association_data = [] %}
     {% for property in ass.ends %}
