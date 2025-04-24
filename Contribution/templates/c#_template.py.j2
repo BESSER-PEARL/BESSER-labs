@@ -1,0 +1,189 @@
+{# Python to C# type mapping #}
+{%- set type_map = {
+    'str': 'string',     
+    'int': 'int',
+    'float': 'double',
+    'bool': 'bool',
+    'long': 'long',
+    'bytes': 'byte[]',
+    'None': 'object',
+
+    'list': 'List<T>', 
+    'dict': 'Dictionary<K,V>',
+    'set': 'HashSet<T>',
+    'tuple': 'object[]',
+
+    'datetime': 'DateTime',
+    'date': 'DateOnly',
+    'time': 'TimeOnly',
+    'timezone': 'TimeZoneInfo',
+    'timedelta': 'TimeSpan',
+
+    'array': 'T[]',
+    'any': 'object',
+    'callable': 'Func<T,R>',
+    'generator': 'IEnumerable<T>'
+}
+-%}
+
+{# Using namespaces #}
+{%- set using_map = {
+    'list': 'System.Collections.Generic',
+    'dict': 'System.Collections.Generic',
+    'set': 'System.Collections.Generic',
+    'datetime': 'System',
+    'date': 'System',
+    'time': 'System',
+    'timezone': 'System',
+    'timedelta': 'System',
+    'callable': 'System',
+    'generator': 'System.Collections.Generic',
+} -%}
+
+{%- set usings_already = [] -%}
+{% set associations = [] %}
+{# 0. Get associations and their multiplicities #}
+{%- for ass in model.associations -%} 
+    {% set association_data = [] %}
+    {% for property in ass.ends %}
+        {% if property.multiplicity is defined %}
+            {% set _ = association_data.append(property.multiplicity._Multiplicity__min) %}
+            {% set _ = association_data.append(property.multiplicity._Multiplicity__max) %}
+        {% endif %}
+        {% if property.type is defined and property.type.__class__.__name__ == 'Class' %}
+            {% set _ = association_data.append(property.type.name) %}
+        {% endif %}
+    {% endfor %}
+    {% set _ = associations.append(association_data) %}
+{%- endfor -%}
+
+{# 1. Using directives #}
+{% for ass in associations %}
+    {% if 'list' not in usings_already %}
+        {% if ass[1] > 1 or ass[4] > 1 %}
+            {% set _ = usings_already.append('list') %}
+using {{ using_map.get('list') }};
+        {% endif %}
+    {% endif %}
+{% endfor %}
+{% for hypothetical_type, using_path in using_map.items() %}
+    {% for model in model.get_classes() %}
+        {% for attribute in model.attributes %}
+            {% if hypothetical_type == attribute.type.name and not hypothetical_type in usings_already %}
+                {% set _ = usings_already.append(hypothetical_type) %}
+using {{ using_path }};
+            {% endif %}
+        {% endfor %}
+    {% endfor %}
+{% endfor %}
+
+{% for class in model.get_classes() %}
+    {% set tmp_associations = [] %}
+    {%- for ass in associations -%}
+        {% if ass[2] == class.name or ass[5] == class.name %}
+        {% set _ = tmp_associations.append(ass) %}
+        {% endif %}
+    {%- endfor -%}
+
+public class {{ class.name }} {
+    {# 2. Define properties and relation-based collections #}
+    {% for attribute in class.attributes %}
+    public {{ type_map.get(attribute.type.name) }} {{ attribute.name|capitalize }} { get; set; }
+    {% endfor %}
+    {% for ass in tmp_associations %}
+        {% if ass[2] == class.name %}
+            {% if ass[4] > 1 %}
+    public List<{{ ass[5] }}> {{ ass[5] }}s { get; set; }
+            {% else %}
+    public {{ ass[5] }} {{ ass[5] }} { get; set; }
+            {% endif %}
+        {% else %}
+            {% if ass[1] > 1 %}
+    public List<{{ ass[2] }}> {{ ass[2] }}s { get; set; }
+            {% else %}
+    public {{ ass[2] }} {{ ass[2] }} { get; set; }
+            {% endif %}
+        {% endif %}
+    {% endfor %}
+
+    {# 3. Constructor #}
+    public {{ class.name }}({%- for attribute in class.attributes -%}
+        {{ type_map.get(attribute.type.name) }} {{ attribute.name }}{% if not loop.last %}, {% endif %}
+    {%- endfor -%})
+    {
+        {% for attribute in class.attributes %}
+        this.{{ attribute.name|capitalize }} = {{ attribute.name }};
+        {% endfor %}
+        {% for ass in tmp_associations %}
+            {% if ass[2] == class.name %}
+                {% if ass[4] > 1 %}
+        this.{{ ass[5] }}s = new List<{{ ass[5] }}>();
+                {% else %}
+        this.{{ ass[5] }} = null;
+                {% endif %}
+            {% else %}
+                {% if ass[1] > 1 %}
+        this.{{ ass[2] }}s = new List<{{ ass[2] }}>();
+                {% else %}
+        this.{{ ass[2] }} = null;
+                {% endif %}
+            {% endif %}
+        {% endfor %}
+    }
+
+    {# 4. Relational Methods - Add Methods for Lists #}
+    {% for ass in tmp_associations %}
+        {% if ass[2] == class.name and ass[4] > 1 %}
+    public void Add{{ ass[5] }}({{ ass[5] }} {{ ass[5]|lower }})
+    {
+        if (!{{ ass[5] }}s.Contains({{ ass[5]|lower }}))
+        {
+            {{ ass[5] }}s.Add({{ ass[5]|lower }});
+            {% if ass[1] > 1 %}
+            {{ ass[5]|lower }}.Add{{ class.name }}(this);
+            {% else %}
+            {{ ass[5]|lower }}.{{ class.name }} = this;
+            {% endif %}
+        }
+    }
+        {% elif ass[5] == class.name and ass[1] > 1 %}
+    public void Add{{ ass[2] }}({{ ass[2] }} {{ ass[2]|lower }})
+    {
+        if (!{{ ass[2] }}s.Contains({{ ass[2]|lower }}))
+        {
+            {{ ass[2] }}s.Add({{ ass[2]|lower }});
+            {% if ass[4] > 1 %}
+            {{ ass[2]|lower }}.Add{{ class.name }}(this);
+            {% else %}
+            {{ ass[2]|lower }}.{{ class.name }} = this;
+            {% endif %}
+        }
+    }
+        {% endif %}
+    {% endfor %}
+
+    {# 5. ToString override #}
+    public override string ToString()
+    {
+        return "{{ class.name }}{
+            {%- for attribute in class.attributes -%}
+                {{ attribute.name|capitalize }}=" + {{ attribute.name|capitalize }} + "{% if not loop.last %}, {% endif %}
+            {%- endfor -%}
+            {%- for ass in tmp_associations -%}
+                {%- if ass[2] == class.name -%}
+                    {%- if ass[4] > 1 -%}
+                        , {{ ass[5]|capitalize }}s=" + {{ ass[5]|capitalize }}s.Count + {% if not loop.last %} "{% endif %}
+                    {%- else -%}
+                        , {{ ass[5]|capitalize }}=" + ({{ ass[5]|capitalize }} != null ? {{ ass[5]|capitalize }}.Name : "None") + {% if not loop.last %} "{% endif %}
+                    {%- endif -%}
+                {%- elif ass[5] == class.name -%}
+                    {%- if ass[1] > 1 -%}
+                        , {{ ass[2]|capitalize }}s=" + {{ ass[2]|capitalize }}s.Count + {% if not loop.last %} "{% endif %}
+                    {%- else -%}
+                        , {{ ass[2]|capitalize }}=" + ({{ ass[2]|capitalize}} != null ? {{ ass[2]|capitalize }}.Name : "None") + {% if not loop.last %} "{% endif %}
+                    {%- endif -%}
+                {%- endif -%}
+            {%- endfor -%} "}";
+    }
+}
+{% endfor %}
